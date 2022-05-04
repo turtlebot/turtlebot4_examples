@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>turtlebot4_python_examples</name>
+  <version>0.0.0</version>
+  <description>TurtleBot 4 Python Examples</description>
+  <maintainer email="rkreinin@clearpathrobotics.com">rkreinin</maintainer>
+  <license>Apache 2.0</license>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <!-- TurtleBot 4-->
+  <depend>turtlebot4_description</depend>
+  <depend>turtlebot4_msgs</depend> 
+  <depend>turtlebot4_navigation</depend>
+  <depend>turtlebot4_node</depend>
+
+  <!-- TurtleBot 4 Robot-->
+  <depend>turtlebot4_base</depend>
+  <depend>turtlebot4_bringup</depend>
+  <depend>turtlebot4_diagnostics</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
