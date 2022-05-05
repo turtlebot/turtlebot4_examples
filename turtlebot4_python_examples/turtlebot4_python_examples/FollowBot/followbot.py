@@ -67,17 +67,15 @@ class FollowBot(Node):
                 # Person detected
                 if detection.id == '15':
                     position_x = detection.bbox.center.x
-
-                    left_boundary = position_x - detection.bbox.size_x / 2
-                    right_boundary = position_x + detection.bbox.size_x / 2
-
                     bbox_size = detection.bbox.size_x * detection.bbox.size_y
-
                     center_dist = position_x - self.image_width / 2
 
-                    if abs(center_dist) < 20.0:
-                        self.direction = self.CENTER
-                    elif abs(center_dist) < 75.0:
+                    if abs(center_dist) < self.fwd_margin:
+                        if bbox_size < self.stop_bbox_size:
+                            self.direction = self.CENTER
+                        else:
+                            self.direction = self.STOP
+                    elif abs(center_dist) < self.turn_margin:
                         if center_dist > 0.0:
                             self.direction = self.FORWARD_RIGHT
                         else:
@@ -87,20 +85,6 @@ class FollowBot(Node):
                             self.direction = self.RIGHT
                         else:
                             self.direction = self.LEFT
-
-                    # if left_boundary > self.image_width / 2 + self.turn_margin:
-                    #     self.direction = self.RIGHT
-                    # elif left_boundary > self.image_width / 2 + self.fwd_margin:
-                    #     self.direction = self.FORWARD_RIGHT
-                    # elif right_boundary < self.image_width / 2 - self.turn_margin:
-                    #     self.direction = self.LEFT
-                    # elif right_boundary < self.image_width / 2 - self.fwd_margin:
-                    #     self.direction = self.FORWARD_LEFT
-                    # else:
-                    #     if bbox_size < self.stop_bbox_size:
-                    #         self.direction = self.CENTER
-                    #     else:
-                    #         self.direction = self.STOP
                     return
         else:
             self.direction = self.UNKNOWN
