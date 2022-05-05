@@ -23,7 +23,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 
-from vision_msgs.msg import Detection2DArray
+from vision_msgs.msg import Detection2DArray, Detection2D
 
 from turtlebot4_msgs.msg import UserLed
 
@@ -61,11 +61,53 @@ class FollowBot(Node):
         self.audio_pub = self.create_publisher(AudioNoteVector, '/cmd_audio', qos_profile_sensor_data)
 
 
+    def getDriveDirection(self, detection: Detection2D):
+        if detection is None:
+            self.direction = self.UNKNOWN
+            return
+
+        position_x = detection.bbox.center.x
+        bbox_size = detection.bbox.size_x * detection.bbox.size_y
+        center_dist = position_x - self.image_width / 2
+
+        # Person is centered
+        if abs(center_dist) < self.fwd_margin:
+            # Persons box is smaller than stop threshold, drive forward
+            if bbox_size < self.stop_bbox_size:
+                self.direction = self.CENTER
+            # Persons box is larger than stop threshold, stop
+            else:
+                self.direction = self.STOP
+        # Person is near center
+        elif abs(center_dist) < self.turn_margin:
+            # Person is to the right of center
+            if center_dist > 0.0:
+                # Persons box is smaller than stop threshold, drive forward and turn right
+                if bbox_size < self.stop_bbox_size:
+                    self.direction = self.FORWARD_RIGHT
+                # Persons box is larger than stop threshold, turn right
+                else:
+                    self.direction = self.RIGHT
+            else:
+                # Persons box is smaller than stop threshold, drive forward and turn left
+                if bbox_size < self.stop_bbox_size:
+                    self.direction = self.FORWARD_LEFT
+                # Persons box is larger than stop threshold, turn left
+                else:
+                    self.direction = self.LEFT
+        # Person is near edge of frame
+        else:
+            # Turn right
+            if center_dist > 0.0:
+                self.direction = self.RIGHT
+            # Turn left
+            else:
+                self.direction = self.LEFT
+
     def mobilenetCallback(self, msg: Detection2DArray):
         largest_box = 0
         closest_person = None
         if len(msg.detections) > 0:
-
             # Play a sound when detecting someone new
             if self.direction == self.UNKNOWN:
                 self.detectAudio()
@@ -78,45 +120,7 @@ class FollowBot(Node):
                         largest_box = bbox_size
                         closest_person = detection
 
-            position_x = closest_person.bbox.center.x
-            bbox_size = closest_person.bbox.size_x * closest_person.bbox.size_y
-            center_dist = position_x - self.image_width / 2
-
-            # Person is centered
-            if abs(center_dist) < self.fwd_margin:
-                # Persons box is smaller than stop threshold, drive forward
-                if bbox_size < self.stop_bbox_size:
-                    self.direction = self.CENTER
-                # Persons box is larger than stop threshold, stop
-                else:
-                    self.direction = self.STOP
-            # Person is near center
-            elif abs(center_dist) < self.turn_margin:
-                # Person is to the right of center
-                if center_dist > 0.0:
-                    # Persons box is smaller than stop threshold, drive forward and turn right
-                    if bbox_size < self.stop_bbox_size:
-                        self.direction = self.FORWARD_RIGHT
-                    # Persons box is larger than stop threshold, turn right
-                    else:
-                        self.direction = self.RIGHT
-                else:
-                    # Persons box is smaller than stop threshold, drive forward and turn left
-                    if bbox_size < self.stop_bbox_size:
-                        self.direction = self.FORWARD_LEFT
-                    # Persons box is larger than stop threshold, turn left
-                    else:
-                        self.direction = self.LEFT
-            # Person is near edge of frame
-            else:
-                # Turn right
-                if center_dist > 0.0:
-                    self.direction = self.RIGHT
-                # Turn left
-                else:
-                    self.direction = self.LEFT
-        else:
-            self.direction = self.UNKNOWN
+        self.getDriveDirection(closest_person)
 
     def led(self, led, color, period, duty):
         msg = UserLed()
@@ -169,7 +173,7 @@ class FollowBot(Node):
 
         anotes = AudioNoteVector()
         #anotes.notes = [a, b, c, d, e, f, g]
-        anotes.notes = [beep, beep, beep]
+        anotes.notes = [beep]
         self.audio_pub.publish(anotes)
 
     def run(self):
