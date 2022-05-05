@@ -44,8 +44,9 @@ class FollowBot(Node):
     previous_direction = RIGHT
     image_width = 300
     image_height = 300
-    fwd_margin = 25
-    turn_margin = 50
+    fwd_margin = 20
+    turn_margin = 75
+    stop_bbox_size = 50000.0
 
     def __init__(self):
         super().__init__('followbot')
@@ -72,19 +73,34 @@ class FollowBot(Node):
 
                     bbox_size = detection.bbox.size_x * detection.bbox.size_y
 
-                    if left_boundary > self.image_width / 2 + self.turn_margin:
-                        self.direction = self.RIGHT
-                    elif left_boundary > self.image_width / 2 + self.fwd_margin:
-                        self.direction = self.FORWARD_RIGHT
-                    elif right_boundary < self.image_width / 2 - self.turn_margin:
-                        self.direction = self.LEFT
-                    elif right_boundary < self.image_width / 2 - self.fwd_margin:
-                        self.direction = self.FORWARD_LEFT
-                    else:
-                        if bbox_size < 50000.0:
-                            self.direction = self.CENTER
+                    center_dist = position_x - self.image_width / 2
+
+                    if abs(center_dist) < 20.0:
+                        self.direction = self.CENTER
+                    elif abs(center_dist) < 75.0:
+                        if center_dist > 0.0:
+                            self.direction = self.FORWARD_RIGHT
                         else:
-                            self.direction = self.STOP
+                            self.direction = self.FORWARD_LEFT
+                    else:
+                        if center_dist > 0.0:
+                            self.direction = self.RIGHT
+                        else:
+                            self.direction = self.LEFT
+
+                    # if left_boundary > self.image_width / 2 + self.turn_margin:
+                    #     self.direction = self.RIGHT
+                    # elif left_boundary > self.image_width / 2 + self.fwd_margin:
+                    #     self.direction = self.FORWARD_RIGHT
+                    # elif right_boundary < self.image_width / 2 - self.turn_margin:
+                    #     self.direction = self.LEFT
+                    # elif right_boundary < self.image_width / 2 - self.fwd_margin:
+                    #     self.direction = self.FORWARD_LEFT
+                    # else:
+                    #     if bbox_size < self.stop_bbox_size:
+                    #         self.direction = self.CENTER
+                    #     else:
+                    #         self.direction = self.STOP
                     return
         else:
             self.direction = self.UNKNOWN
@@ -95,6 +111,7 @@ class FollowBot(Node):
         msg.color = color
         msg.blink_period = period
         msg.duty_cycle = duty
+
         self.user_led_pub.publish(msg)
 
     def drive(self, linear_x, angular_z):
