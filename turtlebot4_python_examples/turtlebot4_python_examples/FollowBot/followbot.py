@@ -46,7 +46,7 @@ class FollowBot(Node):
     image_height = 300
     fwd_margin = 20
     turn_margin = 75
-    stop_bbox_size = 50000.0
+    stop_bbox_size = 60000.0
 
     def __init__(self):
         super().__init__('followbot')
@@ -62,30 +62,59 @@ class FollowBot(Node):
 
 
     def mobilenetCallback(self, msg: Detection2DArray):
+        largest_box = 0
+        closest_person = None
         if len(msg.detections) > 0:
+
+            # Play a sound when detecting someone new
+            if self.direction == self.UNKNOWN:
+                self.detectAudio()
+
             for detection in msg.detections:
                 # Person detected
                 if detection.id == '15':
-                    position_x = detection.bbox.center.x
                     bbox_size = detection.bbox.size_x * detection.bbox.size_y
-                    center_dist = position_x - self.image_width / 2
+                    if bbox_size > largest_box:
+                        largest_box = bbox_size
+                        closest_person = detection
 
-                    if abs(center_dist) < self.fwd_margin:
-                        if bbox_size < self.stop_bbox_size:
-                            self.direction = self.CENTER
-                        else:
-                            self.direction = self.STOP
-                    elif abs(center_dist) < self.turn_margin:
-                        if center_dist > 0.0:
-                            self.direction = self.FORWARD_RIGHT
-                        else:
-                            self.direction = self.FORWARD_LEFT
+            position_x = closest_person.bbox.center.x
+            bbox_size = closest_person.bbox.size_x * closest_person.bbox.size_y
+            center_dist = position_x - self.image_width / 2
+
+            # Person is centered
+            if abs(center_dist) < self.fwd_margin:
+                # Persons box is smaller than stop threshold, drive forward
+                if bbox_size < self.stop_bbox_size:
+                    self.direction = self.CENTER
+                # Persons box is larger than stop threshold, stop
+                else:
+                    self.direction = self.STOP
+            # Person is near center
+            elif abs(center_dist) < self.turn_margin:
+                # Person is to the right of center
+                if center_dist > 0.0:
+                    # Persons box is smaller than stop threshold, drive forward and turn right
+                    if bbox_size < self.stop_bbox_size:
+                        self.direction = self.FORWARD_RIGHT
+                    # Persons box is larger than stop threshold, turn right
                     else:
-                        if center_dist > 0.0:
-                            self.direction = self.RIGHT
-                        else:
-                            self.direction = self.LEFT
-                    return
+                        self.direction = self.RIGHT
+                else:
+                    # Persons box is smaller than stop threshold, drive forward and turn left
+                    if bbox_size < self.stop_bbox_size:
+                        self.direction = self.FORWARD_LEFT
+                    # Persons box is larger than stop threshold, turn left
+                    else:
+                        self.direction = self.LEFT
+            # Person is near edge of frame
+            else:
+                # Turn right
+                if center_dist > 0.0:
+                    self.direction = self.RIGHT
+                # Turn left
+                else:
+                    self.direction = self.LEFT
         else:
             self.direction = self.UNKNOWN
 
