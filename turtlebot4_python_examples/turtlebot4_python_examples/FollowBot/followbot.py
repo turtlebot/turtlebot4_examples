@@ -66,6 +66,10 @@ class FollowBot(Node):
             self.direction = self.UNKNOWN
             return
 
+        # Play a sound when detecting someone new
+        if self.direction == self.UNKNOWN:
+            self.detectAudio()
+
         position_x = detection.bbox.center.x
         bbox_size = detection.bbox.size_x * detection.bbox.size_y
         center_dist = position_x - self.image_width / 2
@@ -108,10 +112,6 @@ class FollowBot(Node):
         largest_box = 0
         closest_person = None
         if len(msg.detections) > 0:
-            # Play a sound when detecting someone new
-            if self.direction == self.UNKNOWN:
-                self.detectAudio()
-
             for detection in msg.detections:
                 # Person detected
                 if detection.id == '15':
