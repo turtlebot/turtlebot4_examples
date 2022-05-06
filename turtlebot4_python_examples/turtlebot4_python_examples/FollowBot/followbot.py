@@ -29,8 +29,6 @@ from turtlebot4_msgs.msg import UserLed
 
 from geometry_msgs.msg import Twist
 
-from irobot_create_msgs.msg import AudioNote, AudioNoteVector
-
 class FollowBot(Node):
     UNKNOWN = 0
     LEFT = 1
@@ -58,17 +56,12 @@ class FollowBot(Node):
 
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', qos_profile_system_default)
         self.user_led_pub = self.create_publisher(UserLed, '/hmi/led', qos_profile_sensor_data)
-        self.audio_pub = self.create_publisher(AudioNoteVector, '/cmd_audio', qos_profile_sensor_data)
 
 
     def getDriveDirection(self, detection: Detection2D):
         if detection is None:
             self.direction = self.UNKNOWN
             return
-
-        # Play a sound when detecting someone new
-        if self.direction == self.UNKNOWN:
-            self.detectAudio()
 
         position_x = detection.bbox.center.x
         bbox_size = detection.bbox.size_x * detection.bbox.size_y
@@ -137,44 +130,6 @@ class FollowBot(Node):
         msg.linear.x = linear_x
 
         self.cmd_vel_pub.publish(msg)
-
-    def detectAudio(self):
-        a = AudioNote()
-        a.frequency = 220
-        a.max_runtime.nanosec = 300000000
-
-        b = AudioNote()
-        b.frequency = 247
-        b.max_runtime.nanosec = 300000000
-
-        c = AudioNote()
-        c.frequency = 262
-        c.max_runtime.nanosec = 300000000
-
-        d = AudioNote()
-        d.frequency = 294
-        d.max_runtime.nanosec = 300000000
-
-        e = AudioNote()
-        e.frequency = 330
-        e.max_runtime.nanosec = 300000000
-
-        f = AudioNote()
-        f.frequency = 349
-        f.max_runtime.nanosec = 300000000
-
-        g = AudioNote()
-        g.frequency = 392
-        g.max_runtime.nanosec = 300000000
-
-        beep = AudioNote()
-        beep.frequency = 1760
-        beep.max_runtime.nanosec = 400000000
-
-        anotes = AudioNoteVector()
-        #anotes.notes = [a, b, c, d, e, f, g]
-        anotes.notes = [beep]
-        self.audio_pub.publish(anotes)
 
     def run(self):
         while True:
