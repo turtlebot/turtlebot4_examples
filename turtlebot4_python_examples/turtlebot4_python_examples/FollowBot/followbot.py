@@ -49,7 +49,7 @@ class FollowBot(Node):
     image_height = 300
     fwd_margin = 20
     turn_margin = 75
-    stop_upper_thresh = 60000.0
+    stop_upper_thresh = 70000.0
     stop_lower_thresh = 50000.0
     is_docked = False
 
