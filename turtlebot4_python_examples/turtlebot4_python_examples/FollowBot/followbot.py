@@ -94,14 +94,14 @@ class FollowBot(Node):
             # Person is to the right of center
             if center_dist > 0.0:
                 # Persons box is smaller than stop threshold, drive forward and turn right
-                if bbox_size < self.stop_bbox_size:
+                if bbox_size < self.stop_lower_thresh:
                     self.direction = self.FORWARD_RIGHT
                 # Persons box is larger than stop threshold, turn right
                 else:
                     self.direction = self.RIGHT
             else:
                 # Persons box is smaller than stop threshold, drive forward and turn left
-                if bbox_size < self.stop_bbox_size:
+                if bbox_size < self.stop_lower_thresh:
                     self.direction = self.FORWARD_LEFT
                 # Persons box is larger than stop threshold, turn left
                 else:
