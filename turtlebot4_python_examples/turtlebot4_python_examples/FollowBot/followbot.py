@@ -52,6 +52,7 @@ class FollowBot(Node):
     stop_upper_thresh = 70000.0
     stop_lower_thresh = 50000.0
     is_docked = False
+    last_target_person = None
 
     def __init__(self):
         super().__init__('followbot')
@@ -117,18 +118,23 @@ class FollowBot(Node):
                 self.direction = self.LEFT
 
     def mobilenetCallback(self, msg: Detection2DArray):
-        largest_box = 0
-        closest_person = None
+        closest_target_dist = self.image_width
+        target_person = None
         if len(msg.detections) > 0:
             for detection in msg.detections:
                 # Person detected
                 if detection.id == '15':
-                    bbox_size = detection.bbox.size_x * detection.bbox.size_y
-                    if bbox_size > largest_box:
-                        largest_box = bbox_size
-                        closest_person = detection
+                    # No one previously detected, target first detection
+                    if self.last_target_person == None:
+                        target_person = detection
+                        break
+                    # Find closest target to previous target
+                    if abs(self.last_target_person.bbox.center.x - detection.bbox.center.x) < closest_target_dist:
+                        closest_target_dist = abs(self.last_target_person.bbox.center.x - detection.bbox.center.x)
+                        target_person = detection
 
-        self.getDriveDirection(closest_person)
+        self.last_target_person = target_person
+        self.getDriveDirection(target_person)
 
     def dockCallback(self, msg: Dock):
         self.is_docked = msg.is_docked
