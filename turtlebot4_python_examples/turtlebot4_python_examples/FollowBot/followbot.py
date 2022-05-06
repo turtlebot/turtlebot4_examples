@@ -37,10 +37,11 @@ class FollowBot(Node):
     UNKNOWN = 0
     LEFT = 1
     RIGHT = 2
-    CENTER = 3
-    FORWARD_LEFT = 4
-    FORWARD_RIGHT = 5
-    STOP = 6
+    FORWARD = 3
+    REVERSE = 4
+    FORWARD_LEFT = 5
+    FORWARD_RIGHT = 6
+    STOP = 7
 
     direction = UNKNOWN
     previous_direction = RIGHT
@@ -48,7 +49,8 @@ class FollowBot(Node):
     image_height = 300
     fwd_margin = 20
     turn_margin = 75
-    stop_bbox_size = 60000.0
+    stop_upper_thresh = 60000.0
+    stop_lower_thresh = 40000.0
     is_docked = False
 
     def __init__(self):
@@ -80,8 +82,10 @@ class FollowBot(Node):
         # Person is centered
         if abs(center_dist) < self.fwd_margin:
             # Persons box is smaller than stop threshold, drive forward
-            if bbox_size < self.stop_bbox_size:
-                self.direction = self.CENTER
+            if bbox_size < self.stop_upper_thresh and bbox_size > self.stop_lower_thresh:
+                self.direction = self.FORWARD
+            elif bbox_size > self.stop_upper_thresh:
+                self.direction = self.REVERSE
             # Persons box is larger than stop threshold, stop
             else:
                 self.direction = self.STOP
@@ -161,10 +165,14 @@ class FollowBot(Node):
                 self.drive(0.0, 0.0)
                 self.led(0, 0, 1000, 0.0)
                 self.led(1, 2, 1000, 1.0)
-            elif self.direction == self.CENTER:
+            elif self.direction == self.FORWARD:
                 self.drive(0.3, 0.0)
                 self.led(0, 1, 1000, 1.0)
                 self.led(1, 1, 1000, 1.0)
+            elif self.direction == self.REVERSE:
+                self.drive(-0.2, 0.0)
+                self.led(0, 1, 1000, 0.5)
+                self.led(1, 1, 1000, 0.5)
             elif self.direction == self.LEFT:
                 self.drive(0.0, 0.35)
                 self.previous_direction = self.LEFT
