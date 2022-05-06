@@ -20,6 +20,7 @@ import threading
 import time
 
 import rclpy
+from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 
@@ -28,6 +29,9 @@ from vision_msgs.msg import Detection2DArray, Detection2D
 from turtlebot4_msgs.msg import UserLed
 
 from geometry_msgs.msg import Twist
+
+from irobot_create_msgs.action import DockServo, Undock
+from irobot_create_msgs.msg import Dock
 
 class FollowBot(Node):
     UNKNOWN = 0
@@ -45,6 +49,7 @@ class FollowBot(Node):
     fwd_margin = 20
     turn_margin = 75
     stop_bbox_size = 60000.0
+    is_docked = False
 
     def __init__(self):
         super().__init__('followbot')
@@ -53,10 +58,15 @@ class FollowBot(Node):
                                                      '/color/mobilenet_detections',
                                                      self.mobilenetCallback,
                                                      qos_profile_sensor_data)
+        dock_sub = self.create_subscription(Dock,
+                                            '/dock',
+                                            self.dockCallback,
+                                            qos_profile_sensor_data)
 
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', qos_profile_system_default)
         self.user_led_pub = self.create_publisher(UserLed, '/hmi/led', qos_profile_sensor_data)
 
+        self.undock_action_client = ActionClient(self, Undock, '/undock')
 
     def getDriveDirection(self, detection: Detection2D):
         if detection is None:
@@ -115,6 +125,9 @@ class FollowBot(Node):
 
         self.getDriveDirection(closest_person)
 
+    def dockCallback(self, msg: Dock):
+        self.is_docked = msg.is_docked
+
     def led(self, led, color, period, duty):
         msg = UserLed()
         msg.led = led
@@ -131,7 +144,18 @@ class FollowBot(Node):
 
         self.cmd_vel_pub.publish(msg)
 
+    def undock(self):
+        self.undock_action_client.wait_for_server()
+        undock_goal_result = self.undock_action_client.send_goal(Undock.Goal())
+        if undock_goal_result.result.is_docked:
+            print('Undocking failed')
+
     def run(self):
+        # Undock first
+        if self.is_docked:
+            print('Undocking')
+            self.undock()
+
         while True:
             if self.direction == self.STOP:
                 self.drive(0.0, 0.0)
@@ -180,6 +204,9 @@ def main(args=None):
 
     thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     thread.start()
+
+    # Allow time for other nodes to start
+    time.sleep(5)
 
     print('Running FollowBot...\n')
 
