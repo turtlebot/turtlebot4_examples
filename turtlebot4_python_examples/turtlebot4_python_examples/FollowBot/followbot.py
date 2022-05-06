@@ -50,7 +50,7 @@ class FollowBot(Node):
     fwd_margin = 20
     turn_margin = 75
     stop_upper_thresh = 60000.0
-    stop_lower_thresh = 40000.0
+    stop_lower_thresh = 50000.0
     is_docked = False
 
     def __init__(self):
