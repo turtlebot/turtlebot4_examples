@@ -49,8 +49,8 @@ class FollowBot(Node):
     image_height = 300
     fwd_margin = 20
     turn_margin = 75
-    stop_upper_thresh = 280.0
-    stop_lower_thresh = 200.0
+    stop_upper_thresh = 290.0
+    stop_lower_thresh = 250.0
     is_docked = False
     last_target_person = None
 
