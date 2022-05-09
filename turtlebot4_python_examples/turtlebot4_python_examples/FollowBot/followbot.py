@@ -49,8 +49,9 @@ class FollowBot(Node):
     image_height = 300
     fwd_margin = 20
     turn_margin = 75
-    stop_upper_thresh = 290.0
-    stop_lower_thresh = 250.0
+    stop_upper_x_thresh = 150.0
+    stop_upper_y_thresh = 290.0
+    stop_lower_y_thresh = 270.0
     is_docked = False
     last_target_person = None
 
@@ -77,18 +78,21 @@ class FollowBot(Node):
             return
 
         position_x = detection.bbox.center.x
-        bbox_size = detection.bbox.size_y
-        #print(detection.bbox.size_y)
+        bbox_y = detection.bbox.size_y
+        bbox_x = detection.bbox.size_x
         center_dist = position_x - self.image_width / 2
 
         # Person is centered
         if abs(center_dist) < self.fwd_margin:
             # Persons box is smaller than stop lower threshold, drive forward
-            if bbox_size < self.stop_lower_thresh:
+            if bbox_y < self.stop_lower_y_thresh:
                 self.direction = self.FORWARD
             # Persons box is larger than stop upper threshold, reverse
-            elif bbox_size > self.stop_upper_thresh:
-                self.direction = self.REVERSE
+            elif bbox_y > self.stop_upper_y_thresh:
+                if bbox_x > self.stop_upper_x_thresh:
+                    self.direction = self.REVERSE
+                else:
+                    self.direction = self.FORWARD
             # Persons box is larger than stop threshold, stop
             else:
                 self.direction = self.STOP
@@ -97,14 +101,14 @@ class FollowBot(Node):
             # Person is to the right of center
             if center_dist > 0.0:
                 # Persons box is smaller than stop threshold, drive forward and turn right
-                if bbox_size < self.stop_lower_thresh:
+                if bbox_y < self.stop_lower_y_thresh:
                     self.direction = self.FORWARD_RIGHT
                 # Persons box is larger than stop threshold, turn right
                 else:
                     self.direction = self.RIGHT
             else:
                 # Persons box is smaller than stop threshold, drive forward and turn left
-                if bbox_size < self.stop_lower_thresh:
+                if bbox_y < self.stop_lower_y_thresh:
                     self.direction = self.FORWARD_LEFT
                 # Persons box is larger than stop threshold, turn left
                 else:
