@@ -50,7 +50,7 @@ class FollowBot(Node):
     fwd_margin = 20
     turn_margin = 75
     stop_upper_thresh = 60000.0
-    stop_lower_thresh = 30000.0
+    stop_lower_thresh = 40000.0
     is_docked = False
     last_target_person = None
 
@@ -78,6 +78,7 @@ class FollowBot(Node):
 
         position_x = detection.bbox.center.x
         bbox_size = detection.bbox.size_x * detection.bbox.size_y
+        print(detection.bbox.size_y)
         center_dist = position_x - self.image_width / 2
 
         # Person is centered
