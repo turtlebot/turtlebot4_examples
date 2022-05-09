@@ -80,5 +80,5 @@ def generate_launch_description():
     #ld.add_action(rplidar_launch)
     ld.add_action(oakd_launch)
     ld.add_action(description_launch)
-    ld.add_action(followbot)
+    #ld.add_action(followbot)
     return ld

@@ -145,7 +145,7 @@ class FollowBot(Node):
     def dockCallback(self, msg: Dock):
         self.is_docked = msg.is_docked
 
-    def led(self, led, color, period, duty):
+    def setLed(self, led, color, period, duty):
         msg = UserLed()
         msg.led = led
         msg.color = color
@@ -176,41 +176,41 @@ class FollowBot(Node):
         while True:
             if self.direction == self.STOP:
                 self.drive(0.0, 0.0)
-                self.led(0, 0, 1000, 0.0)
-                self.led(1, 2, 1000, 1.0)
+                self.setLed(0, 0, 1000, 0.0)
+                self.setLed(1, 2, 1000, 1.0)
             elif self.direction == self.FORWARD:
                 self.drive(0.3, 0.0)
-                self.led(0, 1, 1000, 1.0)
-                self.led(1, 1, 1000, 1.0)
+                self.setLed(0, 1, 1000, 1.0)
+                self.setLed(1, 1, 1000, 1.0)
             elif self.direction == self.LEFT:
                 self.drive(0.0, 0.3)
                 self.previous_direction = self.LEFT
-                self.led(0, 0, 1000, 0.5)
-                self.led(1, 1, 1000, 0.5)
+                self.setLed(0, 0, 1000, 0.5)
+                self.setLed(1, 1, 1000, 0.5)
             elif self.direction == self.RIGHT:
                 self.drive(0.0, -0.3)
                 self.previous_direction = self.RIGHT
-                self.led(0, 1, 1000, 0.5)
-                self.led(1, 0, 1000, 0.5)
+                self.setLed(0, 1, 1000, 0.5)
+                self.setLed(1, 0, 1000, 0.5)
             elif self.direction == self.FORWARD_LEFT:
                 self.drive(0.2, 0.2)
                 self.previous_direction = self.LEFT
-                self.led(0, 1, 1000, 1.0)
-                self.led(1, 1, 1000, 0.5)
+                self.setLed(0, 1, 1000, 1.0)
+                self.setLed(1, 1, 1000, 0.5)
             elif self.direction == self.FORWARD_RIGHT:
                 self.drive(0.2, -0.2)
                 self.previous_direction = self.LEFT
-                self.led(0, 1, 1000, 0.5)
-                self.led(1, 1, 1000, 1.0)
+                self.setLed(0, 1, 1000, 0.5)
+                self.setLed(1, 1, 1000, 1.0)
             else:
                 if self.previous_direction == self.LEFT:
                     self.drive(0.0, 0.75)
-                    self.led(0, 0, 500, 0.5)
-                    self.led(1, 1, 500, 0.5)
+                    self.setLed(0, 0, 500, 0.5)
+                    self.setLed(1, 1, 500, 0.5)
                 else:
                     self.drive(0.0, -0.75)
-                    self.led(0, 1, 500, 0.5)
-                    self.led(1, 0, 500, 0.5)
+                    self.setLed(0, 1, 500, 0.5)
+                    self.setLed(1, 0, 500, 0.5)
             time.sleep(1/self.fps)
 
 
