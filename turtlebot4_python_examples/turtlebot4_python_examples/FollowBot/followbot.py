@@ -128,7 +128,7 @@ class FollowBot(Node):
         if len(msg.detections) > 0:
             for detection in msg.detections:
                 # Person detected
-                if detection.id == '15' and detection.results[0].hypothesis.score > 0.90:
+                if detection.results[0].class_id == '15' and detection.results[0].score > 0.90:
                     # No one previously detected, target first detection
                     if self.last_target_person is None:
                         target_person = detection
