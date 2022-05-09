@@ -24,7 +24,9 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 
-from vision_msgs.msg import Detection2DArray, Detection2D, ObjectHypothesisWithPose
+from vision_msgs.msg import Detection2DArray, Detection2D
+
+from depthai_ros_msgs.msg import SpatialDetectionArray, SpatialDetection
 
 from turtlebot4_msgs.msg import UserLed
 
@@ -49,16 +51,14 @@ class FollowBot(Node):
     fps = 15
     fwd_margin = 20
     turn_margin = 75
-    stop_upper_x_thresh = 200.0
-    stop_upper_y_thresh = 290.0
-    stop_lower_y_thresh = 290.0
+    stop_lower_thresh = 1.0
     is_docked = False
     last_target_person = None
 
     def __init__(self):
         super().__init__('followbot')
 
-        mobilenet_sub = self.create_subscription(Detection2DArray,
+        mobilenet_sub = self.create_subscription(SpatialDetectionArray,
                                                      '/color/mobilenet_detections',
                                                      self.mobilenetCallback,
                                                      qos_profile_sensor_data)
@@ -72,20 +72,19 @@ class FollowBot(Node):
 
         self.undock_action_client = ActionClient(self, Undock, '/undock')
 
-    def getDriveDirection(self, detection: Detection2D):
+    def getDriveDirection(self, detection: SpatialDetection):
         if detection is None:
             self.direction = self.UNKNOWN
             return
 
         position_x = detection.bbox.center.x
-        bbox_y = detection.bbox.size_y
-        bbox_x = detection.bbox.size_x
+        distance = detection.position.z
         center_dist = position_x - self.image_width / 2
 
         # Person is centered
         if abs(center_dist) < self.fwd_margin:
             # Persons box is smaller than stop lower threshold, drive forward
-            if bbox_y < self.stop_lower_y_thresh:
+            if distance < self.stop_lower_thresh:
                 self.direction = self.FORWARD
             # Persons box is larger than stop upper threshold,
             # stop if box width is large enough
@@ -102,14 +101,14 @@ class FollowBot(Node):
             # Person is to the right of center
             if center_dist > 0.0:
                 # Persons box is smaller than stop threshold, drive forward and turn right
-                if bbox_y < self.stop_lower_y_thresh:
+                if distance < self.stop_lower_thresh:
                     self.direction = self.FORWARD_RIGHT
                 # Persons box is larger than stop threshold, turn right
                 else:
                     self.direction = self.RIGHT
             else:
                 # Persons box is smaller than stop threshold, drive forward and turn left
-                if bbox_y < self.stop_lower_y_thresh:
+                if distance < self.stop_lower_thresh:
                     self.direction = self.FORWARD_LEFT
                 # Persons box is larger than stop threshold, turn left
                 else:
@@ -123,7 +122,7 @@ class FollowBot(Node):
             else:
                 self.direction = self.LEFT
 
-    def mobilenetCallback(self, msg: Detection2DArray):
+    def mobilenetCallback(self, msg: SpatialDetectionArray):
         closest_target_dist = self.image_width
         target_person = None
         if len(msg.detections) > 0:

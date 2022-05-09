@@ -54,7 +54,7 @@ def generate_launch_description():
 
     standard_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([turtlebot4_robot_launch_file]),
-        launch_arguments=[('model', 'standard'),
+        launch_arguments=[('model', 'lite'),
                           ('param_file', turtlebot4_param_yaml_file)])
     teleop_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([joy_teleop_launch_file]))
@@ -65,7 +65,7 @@ def generate_launch_description():
         launch_arguments=[('tf_prefix', 'oakd_pro')])
     description_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([description_launch_file]),
-        launch_arguments=[('model', 'standard')])
+        launch_arguments=[('model', 'lite')])
 
     followbot = Node(
         package='turtlebot4_python_examples',
