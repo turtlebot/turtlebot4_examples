@@ -46,11 +46,12 @@ class FollowBot(Node):
     previous_direction = RIGHT
     image_width = 300
     image_height = 300
+    fps = 15
     fwd_margin = 20
     turn_margin = 75
     stop_upper_x_thresh = 200.0
     stop_upper_y_thresh = 290.0
-    stop_lower_y_thresh = 270.0
+    stop_lower_y_thresh = 290.0
     is_docked = False
     last_target_person = None
 
@@ -88,11 +89,11 @@ class FollowBot(Node):
                 self.direction = self.FORWARD
             # Persons box is larger than stop upper threshold,
             # stop if box width is large enough
-            elif bbox_y > self.stop_upper_y_thresh:
-                if bbox_x > self.stop_upper_x_thresh:
-                    self.direction = self.STOP
-                else:
-                    self.direction = self.FORWARD
+            # elif bbox_y > self.stop_upper_y_thresh:
+            #     if bbox_x > self.stop_upper_x_thresh:
+            #         self.direction = self.STOP
+            #     else:
+            #         self.direction = self.FORWARD
             # Persons box is larger than stop threshold, stop
             else:
                 self.direction = self.STOP
@@ -130,7 +131,7 @@ class FollowBot(Node):
                 # Person detected
                 if detection.id == '15':
                     # No one previously detected, target first detection
-                    if self.last_target_person == None:
+                    if self.last_target_person is None:
                         target_person = detection
                         break
                     # Find closest target to previous target
@@ -210,7 +211,7 @@ class FollowBot(Node):
                     self.drive(0.0, -0.75)
                     self.led(0, 1, 500, 0.5)
                     self.led(1, 0, 500, 0.5)
-            time.sleep(0.05)
+            time.sleep(1/self.fps)
 
 
 def main(args=None):
