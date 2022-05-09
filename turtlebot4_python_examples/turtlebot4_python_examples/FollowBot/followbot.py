@@ -38,10 +38,9 @@ class FollowBot(Node):
     LEFT = 1
     RIGHT = 2
     FORWARD = 3
-    REVERSE = 4
-    FORWARD_LEFT = 5
-    FORWARD_RIGHT = 6
-    STOP = 7
+    FORWARD_LEFT = 4
+    FORWARD_RIGHT = 5
+    STOP = 6
 
     direction = UNKNOWN
     previous_direction = RIGHT
@@ -87,10 +86,11 @@ class FollowBot(Node):
             # Persons box is smaller than stop lower threshold, drive forward
             if bbox_y < self.stop_lower_y_thresh:
                 self.direction = self.FORWARD
-            # Persons box is larger than stop upper threshold, reverse
+            # Persons box is larger than stop upper threshold,
+            # stop if box width is large enough
             elif bbox_y > self.stop_upper_y_thresh:
                 if bbox_x > self.stop_upper_x_thresh:
-                    self.direction = self.REVERSE
+                    self.direction = self.STOP
                 else:
                     self.direction = self.FORWARD
             # Persons box is larger than stop threshold, stop
@@ -181,10 +181,6 @@ class FollowBot(Node):
                 self.drive(0.3, 0.0)
                 self.led(0, 1, 1000, 1.0)
                 self.led(1, 1, 1000, 1.0)
-            elif self.direction == self.REVERSE:
-                self.drive(-0.2, 0.0)
-                self.led(0, 1, 1000, 0.5)
-                self.led(1, 1, 1000, 0.5)
             elif self.direction == self.LEFT:
                 self.drive(0.0, 0.3)
                 self.previous_direction = self.LEFT
