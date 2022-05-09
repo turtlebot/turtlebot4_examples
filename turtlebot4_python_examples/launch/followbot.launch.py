@@ -77,7 +77,7 @@ def generate_launch_description():
     ld.add_action(param_file_cmd)
     ld.add_action(standard_launch)
     ld.add_action(teleop_launch)
-    ld.add_action(rplidar_launch)
+    #ld.add_action(rplidar_launch)
     ld.add_action(oakd_launch)
     ld.add_action(description_launch)
     ld.add_action(followbot)

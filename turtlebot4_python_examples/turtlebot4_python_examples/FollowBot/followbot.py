@@ -49,8 +49,8 @@ class FollowBot(Node):
     image_height = 300
     fwd_margin = 20
     turn_margin = 75
-    stop_upper_thresh = 70000.0
-    stop_lower_thresh = 50000.0
+    stop_upper_thresh = 60000.0
+    stop_lower_thresh = 30000.0
     is_docked = False
     last_target_person = None
 
@@ -181,22 +181,22 @@ class FollowBot(Node):
                 self.led(0, 1, 1000, 0.5)
                 self.led(1, 1, 1000, 0.5)
             elif self.direction == self.LEFT:
-                self.drive(0.0, 0.35)
+                self.drive(0.0, 0.3)
                 self.previous_direction = self.LEFT
                 self.led(0, 0, 1000, 0.5)
                 self.led(1, 1, 1000, 0.5)
             elif self.direction == self.RIGHT:
-                self.drive(0.0, -0.35)
+                self.drive(0.0, -0.3)
                 self.previous_direction = self.RIGHT
                 self.led(0, 1, 1000, 0.5)
                 self.led(1, 0, 1000, 0.5)
             elif self.direction == self.FORWARD_LEFT:
-                self.drive(0.2, 0.25)
+                self.drive(0.2, 0.2)
                 self.previous_direction = self.LEFT
                 self.led(0, 1, 1000, 1.0)
                 self.led(1, 1, 1000, 0.5)
             elif self.direction == self.FORWARD_RIGHT:
-                self.drive(0.2, -0.25)
+                self.drive(0.2, -0.2)
                 self.previous_direction = self.LEFT
                 self.led(0, 1, 1000, 0.5)
                 self.led(1, 1, 1000, 1.0)
