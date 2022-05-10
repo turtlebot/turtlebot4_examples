@@ -25,10 +25,16 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
 
+ARGUMENTS = [
+    DeclareLaunchArgument('model', default_value='lite',
+                          choices=['standard', 'lite'],
+                          description='Turtlebot4 Model')
+]
+
 def generate_launch_description():
     pkg_turtlebot4_bringup = get_package_share_directory('turtlebot4_bringup')
     pkg_turtlebot4_description = get_package_share_directory('turtlebot4_description')
-    pkg_depthai_examples = get_package_share_directory('depthai_examples')
+    pkg_turtlebot4_cpp_examples = get_package_share_directory('turtlebot4_cpp_examples')
 
     param_file_cmd = DeclareLaunchArgument(
         'param_file',
@@ -44,28 +50,24 @@ def generate_launch_description():
         [pkg_turtlebot4_bringup, 'launch', 'robot.launch.py'])
     joy_teleop_launch_file = PathJoinSubstitution(
         [pkg_turtlebot4_bringup, 'launch', 'joy_teleop.launch.py'])
-    rplidar_launch_file = PathJoinSubstitution(
-        [pkg_turtlebot4_bringup, 'launch', 'rplidar.launch.py'])
     oakd_launch_file = PathJoinSubstitution(
-        [pkg_depthai_examples, 'launch', 'mobile_publisher.launch.py'])
+        [pkg_turtlebot4_cpp_examples, 'launch', 'mobilenet_spatial_publisher.launch.py'])
     description_launch_file = PathJoinSubstitution(
         [pkg_turtlebot4_description, 'launch', 'robot_description.launch.py']
     )
 
     standard_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([turtlebot4_robot_launch_file]),
-        launch_arguments=[('model', 'standard'),
+        launch_arguments=[('model', LaunchConfiguration('model')),
                           ('param_file', turtlebot4_param_yaml_file)])
     teleop_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([joy_teleop_launch_file]))
-    rplidar_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([rplidar_launch_file]))
     oakd_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([oakd_launch_file]),
         launch_arguments=[('tf_prefix', 'oakd_pro')])
     description_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([description_launch_file]),
-        launch_arguments=[('model', 'standard')])
+        launch_arguments=[('model', LaunchConfiguration('model'))])
 
     followbot = Node(
         package='turtlebot4_python_examples',
@@ -73,11 +75,10 @@ def generate_launch_description():
         output='screen'
     )
 
-    ld = LaunchDescription()
+    ld = LaunchDescription(ARGUMENTS)
     ld.add_action(param_file_cmd)
     ld.add_action(standard_launch)
     ld.add_action(teleop_launch)
-    ld.add_action(rplidar_launch)
     ld.add_action(oakd_launch)
     ld.add_action(description_launch)
     ld.add_action(followbot)
