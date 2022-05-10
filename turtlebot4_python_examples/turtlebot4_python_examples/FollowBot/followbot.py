@@ -94,7 +94,8 @@ class FollowBot(Node):
             self.target_direction = Direction.UNKNOWN
             return
 
-        self.last_target_direction = self.target_direction
+        if self.target_direction is not Direction.UNKNOWN:
+            self.last_target_direction = self.target_direction
 
         # Get distance of target to center of image
         center_dist = self.target.bbox.center.x - self.image_width / 2
