@@ -292,6 +292,7 @@ class FollowBot(Node):
         self.last_target = target
         if target is not None:
             self.target_distance = target.position.z
+        self.target = target
         self.getTargetDirection()
 
     def dockCallback(self, msg: Dock):
