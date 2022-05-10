@@ -70,8 +70,8 @@ class FollowBot(Node):
 
     forward_margin_px = 20
     forward_turn_margin_px = 75
-    reverse_thresh = 1.0
-    follow_thresh = 1.5
+    reverse_thresh = 1.2
+    follow_thresh = 1.6
     thresh_hysteresis = 0.05
 
     def __init__(self):
@@ -91,17 +91,50 @@ class FollowBot(Node):
 
         self.undock_action_client = ActionClient(self, Undock, '/undock')
 
+    # Dock subscription callback
+    def dockCallback(self, msg: Dock):
+        self.is_docked = msg.is_docked
+
+    # Set User LEDs for TurtleBot 4
+    def setLed(self, led, color, period, duty):
+        msg = UserLed()
+        msg.led = led
+        msg.color = color
+        msg.blink_period = period
+        msg.duty_cycle = duty
+
+        self.user_led_pub.publish(msg)
+
+    # Send cmd_vel to Create 3
+    def drive(self, linear_x, angular_z):
+        msg = Twist()
+        msg.angular.z = angular_z
+        msg.linear.x = linear_x
+
+        self.cmd_vel_pub.publish(msg)
+
+    # Undock action
+    def undock(self):
+        self.undock_action_client.wait_for_server()
+        undock_goal_result = self.undock_action_client.send_goal(Undock.Goal())
+        if undock_goal_result.result.is_docked:
+            print('Undocking failed')
+
+    # Calculate direction of target relative to robot
     def setTargetDirection(self):
+        # No target found
         if self.target is None:
             self.target_direction = Direction.UNKNOWN
             return
 
+        # Last known direction of target
         if self.target_direction is not Direction.UNKNOWN:
             self.last_target_direction = self.target_direction
 
         # Get distance of target to center of image
         center_dist = self.target.bbox.center.x - self.image_width / 2
 
+        # Find target direction based on position in image
         if abs(center_dist) < self.forward_margin_px:
             self.target_direction = Direction.FORWARD
         elif abs(center_dist) < self.forward_turn_margin_px:
@@ -115,6 +148,7 @@ class FollowBot(Node):
             else:
                 self.target_direction = Direction.LEFT
 
+    # FollowBot state machine
     def stateMachine(self):
         # Searching
         if self.state == State.SEARCHING:
@@ -138,6 +172,7 @@ class FollowBot(Node):
                     self.state = State.FOLLOWING
                 else:
                     self.state = State.TRACKING
+        # Following
         elif self.state == State.FOLLOWING:
             # Lost track of target
             if self.target_direction == Direction.UNKNOWN:
@@ -167,6 +202,7 @@ class FollowBot(Node):
                         self.drive(0.0, 0.3)
                         self.setLed(0, 0, 1000, 0.5)
                         self.setLed(1, 1, 1000, 0.5)
+        # Tracking
         elif self.state == State.TRACKING:
             # Lost track of target
             if self.target_direction == Direction.UNKNOWN:
@@ -197,7 +233,7 @@ class FollowBot(Node):
                         self.drive(0.0, 0.3)
                         self.setLed(0, 0, 1000, 0.5)
                         self.setLed(1, 1, 1000, 0.5)
-
+        # Reversing
         elif self.state == State.REVERSING:
             # Lost track of target
             if self.target_direction == Direction.UNKNOWN:
@@ -227,6 +263,7 @@ class FollowBot(Node):
                         self.setLed(0, 0, 1000, 0.5)
                         self.setLed(1, 1, 1000, 0.5)
 
+    # Callback for mobilenet spatial detection subscription
     def mobilenetCallback(self, msg: SpatialDetectionArray):
         closest_target_dist = self.image_width
         target = None
@@ -239,42 +276,17 @@ class FollowBot(Node):
                     if self.target is None:
                         target = detection
                         break
-                    # Find closest target to previous target
+                    # Find closest detection to previous target
                     if abs(self.target.bbox.center.x - detection.bbox.center.x) < \
                        closest_target_dist:
                         closest_target_dist = abs(
                             self.target.bbox.center.x - detection.bbox.center.x)
                         target = detection
-
+        # Get target distance
         if target is not None:
             self.target_distance = target.position.z
         self.target = target
         self.setTargetDirection()
-
-    def dockCallback(self, msg: Dock):
-        self.is_docked = msg.is_docked
-
-    def setLed(self, led, color, period, duty):
-        msg = UserLed()
-        msg.led = led
-        msg.color = color
-        msg.blink_period = period
-        msg.duty_cycle = duty
-
-        self.user_led_pub.publish(msg)
-
-    def drive(self, linear_x, angular_z):
-        msg = Twist()
-        msg.angular.z = angular_z
-        msg.linear.x = linear_x
-
-        self.cmd_vel_pub.publish(msg)
-
-    def undock(self):
-        self.undock_action_client.wait_for_server()
-        undock_goal_result = self.undock_action_client.send_goal(Undock.Goal())
-        if undock_goal_result.result.is_docked:
-            print('Undocking failed')
 
     def run(self):
         # Undock first
@@ -284,7 +296,6 @@ class FollowBot(Node):
 
         while True:
             self.stateMachine()
-            print(self.state)
             time.sleep(1/self.fps)
 
 
@@ -293,6 +304,7 @@ def main(args=None):
 
     node = FollowBot()
 
+    # Spin rclpy on separate thread
     thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
     thread.start()
 

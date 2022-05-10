@@ -25,6 +25,12 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 
 
+ARGUMENTS = [
+    DeclareLaunchArgument('model', default_value='lite',
+                          choices=['standard', 'lite'],
+                          description='Turtlebot4 Model')
+]
+
 def generate_launch_description():
     pkg_turtlebot4_bringup = get_package_share_directory('turtlebot4_bringup')
     pkg_turtlebot4_description = get_package_share_directory('turtlebot4_description')
@@ -52,7 +58,7 @@ def generate_launch_description():
 
     standard_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([turtlebot4_robot_launch_file]),
-        launch_arguments=[('model', 'lite'),
+        launch_arguments=[('model', LaunchConfiguration('model')),
                           ('param_file', turtlebot4_param_yaml_file)])
     teleop_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([joy_teleop_launch_file]))
@@ -61,7 +67,7 @@ def generate_launch_description():
         launch_arguments=[('tf_prefix', 'oakd_pro')])
     description_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([description_launch_file]),
-        launch_arguments=[('model', 'lite')])
+        launch_arguments=[('model', LaunchConfiguration('model'))])
 
     followbot = Node(
         package='turtlebot4_python_examples',
@@ -69,7 +75,7 @@ def generate_launch_description():
         output='screen'
     )
 
-    ld = LaunchDescription()
+    ld = LaunchDescription(ARGUMENTS)
     ld.add_action(param_file_cmd)
     ld.add_action(standard_launch)
     ld.add_action(teleop_launch)
