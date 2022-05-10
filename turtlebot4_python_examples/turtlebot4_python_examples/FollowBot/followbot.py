@@ -272,6 +272,11 @@ class FollowBot(Node):
     #         # Turn left
     #         else:
     #       lastn(msg.detections) > 0:
+
+    def mobilenetCallback(self, msg: SpatialDetectionArray):
+        closest_target_dist = self.image_width
+        target = None
+        if len(msg.detections) > 0:
             for detection in msg.detections:
                 # Person detected
                 if detection.results[0].class_id == '15' and detection.results[0].score > 0.90:
