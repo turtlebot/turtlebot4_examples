@@ -90,11 +90,11 @@ class FollowBot(Node):
         self.undock_action_client = ActionClient(self, Undock, '/undock')
 
     def getTargetDirection(self):
-        self.last_target_direction = self.target_direction
-
         if self.target is None:
             self.target_direction = Direction.UNKNOWN
             return
+
+        self.last_target_direction = self.target_direction
 
         # Get distance of target to center of image
         center_dist = self.target.bbox.center.x - self.image_width / 2
