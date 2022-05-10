@@ -105,8 +105,8 @@ def generate_launch_description():
         default_value=nn_path,
         description='Path to the object detection blob needed for detection')
 
-    mobilenet_node = launch_ros.actions.Node(
-            package='turtlebot4_cpp_examples', executable='mobilenet_node',
+    mobilenet_spatial_node = launch_ros.actions.Node(
+            package='turtlebot4_cpp_examples', executable='mobilenet_spatial_node',
             output='screen',
             parameters=[{'tf_prefix': tf_prefix},
                         {'camera_param_uri': camera_param_uri},
@@ -131,5 +131,5 @@ def generate_launch_description():
     ld.add_action(declare_sync_nn_cmd)
     ld.add_action(declare_nn_path_cmd)
 
-    ld.add_action(mobilenet_node)
+    ld.add_action(mobilenet_spatial_node)
     return ld

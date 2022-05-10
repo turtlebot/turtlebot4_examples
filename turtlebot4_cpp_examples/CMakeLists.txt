@@ -73,16 +73,16 @@ macro(dai_add_node_ros2 node_name node_src)
 endmacro() 
 
 
-dai_add_node_ros2(mobilenet_node src/mobilenet_publisher.cpp)
+dai_add_node_ros2(mobilenet_spatial_node src/mobilenet_spatial_publisher.cpp)
   
-target_compile_definitions(mobilenet_node PRIVATE BLOB_PATH="${mobilenet_blob}")
+target_compile_definitions(mobilenet_spatial_node PRIVATE BLOB_PATH="${mobilenet_blob}")
 
 install(DIRECTORY params DESTINATION share/${PROJECT_NAME})
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch
 FILES_MATCHING PATTERN "*.py")
 
 install(TARGETS
-        mobilenet_node
+        mobilenet_spatial_node
         DESTINATION lib/${PROJECT_NAME})
         
 ament_package()

@@ -35,12 +35,14 @@ from geometry_msgs.msg import Twist
 from irobot_create_msgs.action import Undock
 from irobot_create_msgs.msg import Dock
 
+
 # FollowBot state
 class State(Enum):
     SEARCHING = 0
     FOLLOWING = 1
     TRACKING = 2
     REVERSING = 3
+
 
 # Direction of target
 class Direction(Enum):
@@ -50,6 +52,7 @@ class Direction(Enum):
     LEFT = 3
     RIGHT = 4
     UNKNOWN = 5
+
 
 class FollowBot(Node):
     image_width = 300
@@ -75,7 +78,7 @@ class FollowBot(Node):
         super().__init__('followbot')
 
         mobilenet_sub = self.create_subscription(SpatialDetectionArray,
-                                                     '/color/mobilenet_detections',
+                                                     '/color/mobilenet_spatial_detections',
                                                      self.mobilenetCallback,
                                                      qos_profile_sensor_data)
         dock_sub = self.create_subscription(Dock,
