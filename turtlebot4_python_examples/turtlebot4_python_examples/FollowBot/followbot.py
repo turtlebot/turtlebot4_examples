@@ -19,6 +19,8 @@
 import threading
 import time
 
+from enum import Enum
+
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
@@ -35,25 +37,41 @@ from geometry_msgs.msg import Twist
 from irobot_create_msgs.action import DockServo, Undock
 from irobot_create_msgs.msg import Dock
 
-class FollowBot(Node):
-    UNKNOWN = 0
-    LEFT = 1
-    RIGHT = 2
-    FORWARD = 3
-    FORWARD_LEFT = 4
-    FORWARD_RIGHT = 5
-    STOP = 6
+# FollowBot state
+class State(Enum):
+    SEARCHING = 0
+    FOLLOWING = 1
+    TRACKING = 2
+    REVERSING = 3
 
-    direction = UNKNOWN
-    previous_direction = RIGHT
+# Direction of target
+class Direction(Enum):
+    FORWARD = 0
+    FORWARD_LEFT = 1
+    FORWARD_RIGHT = 2
+    LEFT = 3
+    RIGHT = 4
+    UNKNOWN = 5
+
+class FollowBot(Node):
     image_width = 300
     image_height = 300
     fps = 15
-    fwd_margin = 20
-    turn_margin = 75
-    stop_lower_thresh = 1.0
+    
     is_docked = False
-    last_target_person = None
+
+    target = None
+    target_direction = Direction.UNKNOWN
+    target_distance = 0.0
+    last_target = None
+    last_target_direction = Direction.UNKNOWN
+    state = State.SEARCHING
+
+    forward_margin_px = 20
+    forward_turn_margin_px = 75
+    reverse_thresh = 1.0
+    follow_thresh = 1.5
+    thresh_hysteresis = 0.05
 
     def __init__(self):
         super().__init__('followbot')
@@ -72,74 +90,203 @@ class FollowBot(Node):
 
         self.undock_action_client = ActionClient(self, Undock, '/undock')
 
-    def getDriveDirection(self, detection: SpatialDetection):
-        if detection is None:
-            self.direction = self.UNKNOWN
+    def getTargetDirection(self):
+        if self.target is None:
+            self.target_direction = Direction.UNKNOWN
             return
 
-        position_x = detection.bbox.center.x
-        distance = detection.position.z
-        center_dist = position_x - self.image_width / 2
+        # Get distance of target to center of image
+        center_dist = self.target.bbox.center.x - self.image_width / 2
 
-        # Person is centered
-        if abs(center_dist) < self.fwd_margin:
-            # Persons box is smaller than stop lower threshold, drive forward
-            if distance > self.stop_lower_thresh:
-                self.direction = self.FORWARD
-            # Persons box is larger than stop upper threshold,
-            # stop if box width is large enough
-            # elif bbox_y > self.stop_upper_y_thresh:
-            #     if bbox_x > self.stop_upper_x_thresh:
-            #         self.direction = self.STOP
-            #     else:
-            #         self.direction = self.FORWARD
-            # Persons box is larger than stop threshold, stop
+        if abs(center_dist) < self.forward_margin_px:
+            self.target_direction = Direction.FORWARD
+        elif abs(center_dist) < self.forward_turn_margin_px:
+            if center_dist >= 0.0:
+                self.target_direction = Direction.FORWARD_RIGHT
             else:
-                self.direction = self.STOP
-        # Person is near center
-        elif abs(center_dist) < self.turn_margin:
-            # Person is to the right of center
-            if center_dist > 0.0:
-                # Persons box is smaller than stop threshold, drive forward and turn right
-                if distance > self.stop_lower_thresh:
-                    self.direction = self.FORWARD_RIGHT
-                # Persons box is larger than stop threshold, turn right
-                else:
-                    self.direction = self.RIGHT
-            else:
-                # Persons box is smaller than stop threshold, drive forward and turn left
-                if distance > self.stop_lower_thresh:
-                    self.direction = self.FORWARD_LEFT
-                # Persons box is larger than stop threshold, turn left
-                else:
-                    self.direction = self.LEFT
-        # Person is near edge of frame
+                self.target_direction = Direction.FORWARD_LEFT
         else:
-            # Turn right
-            if center_dist > 0.0:
-                self.direction = self.RIGHT
-            # Turn left
+            if center_dist >= 0.0:
+                self.target_direction = Direction.RIGHT
             else:
-                self.direction = self.LEFT
+                self.target_direction = Direction.LEFT
 
-    def mobilenetCallback(self, msg: SpatialDetectionArray):
-        closest_target_dist = self.image_width
-        target_person = None
-        if len(msg.detections) > 0:
+    def stateMachine(self):
+        # Searching
+        if self.state == State.SEARCHING:
+            # No target visible
+            if self.target_direction == Direction.UNKNOWN:
+                if self.last_target_direction == Direction.UNKNOWN or \
+                   self.last_target_direction == Direction.RIGHT or \
+                   self.last_target_direction == Direction.FORWARD_RIGHT or \
+                   self.last_target_direction == Direction.FORWARD:
+                    self.drive(0.0, -0.75)
+                    self.setLed(0, 1, 500, 0.5)
+                    self.setLed(1, 0, 500, 0.5)
+                else:
+                    self.drive(0.0, 0.75)
+                    self.setLed(0, 0, 500, 0.5)
+                    self.setLed(1, 1, 500, 0.5)
+            else:
+                if self.target_distance < self.reverse_thresh - self.thresh_hysteresis:
+                    self.state = State.REVERSING
+                elif self.target_distance > self.follow_thresh + self.thresh_hysteresis:
+                    self.state = State.FOLLOWING
+                else:
+                    self.state = State.TRACKING
+        elif self.state == State.FOLLOWING:
+            # Lost track of target
+            if self.target_direction == Direction.UNKNOWN:
+                self.state = State.SEARCHING
+            else:
+                # Target is too close to follow
+                if self.target_distance < self.follow_thresh - self.thresh_hysteresis:
+                    self.state = State.TRACKING
+                else:
+                    if self.target_direction == Direction.FORWARD:
+                        self.drive(0.3, 0.0)
+                        self.setLed(0, 1, 1000, 1.0)
+                        self.setLed(1, 1, 1000, 1.0)
+                    elif self.target_direction == Direction.FORWARD_LEFT:
+                        self.drive(0.2, 0.2)
+                        self.setLed(0, 1, 1000, 1.0)
+                        self.setLed(1, 1, 1000, 0.5)
+                    elif self.target_direction == Direction.FORWARD_RIGHT:
+                        self.drive(0.2, -0.2)
+                        self.setLed(0, 1, 1000, 0.5)
+                        self.setLed(1, 1, 1000, 1.0)
+                    elif self.target_direction == Direction.RIGHT:
+                        self.drive(0.0, -0.3)
+                        self.setLed(0, 1, 1000, 0.5)
+                        self.setLed(1, 0, 1000, 0.5)
+                    else:
+                        self.drive(0.0, 0.3)
+                        self.setLed(0, 0, 1000, 0.5)
+                        self.setLed(1, 1, 1000, 0.5)
+        elif self.state == State.TRACKING:
+            # Lost track of target
+            if self.target_direction == Direction.UNKNOWN:
+                self.state = State.SEARCHING
+            else:
+                if self.target_distance < self.reverse_thresh - self.thresh_hysteresis:
+                    self.state = State.REVERSING
+                elif self.target_distance > self.follow_thresh + self.thresh_hysteresis:
+                    self.state = State.FOLLOWING
+                else:
+                    if self.target_direction == Direction.FORWARD:
+                        self.drive(0.0, 0.0)
+                        self.setLed(0, 0, 1000, 0.0)
+                        self.setLed(1, 2, 1000, 1.0)
+                    elif self.target_direction == Direction.FORWARD_LEFT:
+                        self.drive(0.0, 0.2)
+                        self.setLed(0, 1, 1000, 1.0)
+                        self.setLed(1, 1, 1000, 0.5)
+                    elif self.target_direction == Direction.FORWARD_RIGHT:
+                        self.drive(0.0, -0.2)
+                        self.setLed(0, 1, 1000, 0.5)
+                        self.setLed(1, 1, 1000, 1.0)
+                    elif self.target_direction == Direction.RIGHT:
+                        self.drive(0.0, -0.3)
+                        self.setLed(0, 1, 1000, 0.5)
+                        self.setLed(1, 0, 1000, 0.5)
+                    else:
+                        self.drive(0.0, 0.3)
+                        self.setLed(0, 0, 1000, 0.5)
+                        self.setLed(1, 1, 1000, 0.5)
+
+        elif self.state == State.REVERSING:
+            # Lost track of target
+            if self.target_direction == Direction.UNKNOWN:
+                self.state = State.SEARCHING
+            else:
+                if self.target_distance > self.reverse_thresh + self.thresh_hysteresis:
+                    self.state = State.TRACKING
+                else:
+                    if self.target_direction == Direction.FORWARD:
+                        self.drive(-0.2, 0.0)
+                        self.setLed(0, 0, 1000, 0.0)
+                        self.setLed(1, 2, 1000, 1.0)
+                    elif self.target_direction == Direction.FORWARD_LEFT:
+                        self.drive(-0.2, 0.2)
+                        self.setLed(0, 1, 1000, 1.0)
+                        self.setLed(1, 1, 1000, 0.5)
+                    elif self.target_direction == Direction.FORWARD_RIGHT:
+                        self.drive(-0.2, -0.2)
+                        self.setLed(0, 1, 1000, 0.5)
+                        self.setLed(1, 1, 1000, 1.0)
+                    elif self.target_direction == Direction.RIGHT:
+                        self.drive(-0.1, -0.3)
+                        self.setLed(0, 1, 1000, 0.5)
+                        self.setLed(1, 0, 1000, 0.5)
+                    else:
+                        self.drive(-0.1, 0.3)
+                        self.setLed(0, 0, 1000, 0.5)
+                        self.setLed(1, 1, 1000, 0.5)
+
+    # def getDriveDirection(self, detection: SpatialDetection):
+    #     if detection is None:
+    #         self.direction = self.UNKNOWN
+    #         return
+
+    #     position_x = detection.bbox.center.x
+    #     distance = detection.position.z
+    #     center_dist = position_x - self.image_width / 2
+
+    #     # Person is centered
+    #     if abs(center_dist) < self.fwd_margin:
+    #         # Persons box is smaller than stop lower threshold, drive forward
+    #         if distance > self.stop_lower_thresh:
+    #             self.direction = self.FORWARD
+    #         # Persons box is larger than stop upper threshold,
+    #         # stop if box width is large enough
+    #         # elif bbox_y > self.stop_upper_y_thresh:
+    #         #     if bbox_x > self.stop_upper_x_thresh:
+    #         #         self.direction = self.STOP
+    #         #     else:
+    #         #         self.direction = self.FORWARD
+    #         # Persons box is larger than stop threshold, stop
+    #         else:
+    #             self.direction = self.STOP
+    #     # Person is near center
+    #     elif abs(center_dist) < self.turn_margin:
+    #         # Person is to the right of center
+    #         if center_dist > 0.0:
+    #             # Persons box is smaller than stop threshold, drive forward and turn right
+    #             if distance > self.stop_lower_thresh:
+    #                 self.direction = self.FORWARD_RIGHT
+    #             # Persons box is larger than stop threshold, turn right
+    #             else:
+    #                 self.direction = self.RIGHT
+    #         else:
+    #             # Persons box is smaller than stop threshold, drive forward and turn left
+    #             if distance > self.stop_lower_thresh:
+    #                 self.direction = self.FORWARD_LEFT
+    #             # Persons box is larger than stop threshold, turn left
+    #             else:
+    #                 self.direction = self.LEFT
+    #     # Person is near edge of frame
+    #     else:
+    #         # Turn right
+    #         if center_dist > 0.0:
+    #             self.direction = self.RIGHT
+    #         # Turn left
+    #         else:
+    #       lastn(msg.detections) > 0:
             for detection in msg.detections:
                 # Person detected
                 if detection.results[0].class_id == '15' and detection.results[0].score > 0.90:
                     # No one previously detected, target first detection
-                    if self.last_target_person is None:
-                        target_person = detection
+                    if self.last_target is None:
+                        target = detection
                         break
                     # Find closest target to previous target
-                    if abs(self.last_target_person.bbox.center.x - detection.bbox.center.x) < closest_target_dist:
-                        closest_target_dist = abs(self.last_target_person.bbox.center.x - detection.bbox.center.x)
-                        target_person = detection
+                    if abs(self.last_target.bbox.center.x - detection.bbox.center.x) < closest_target_dist:
+                        closest_target_dist = abs(self.last_target.bbox.center.x - detection.bbox.center.x)
+                        target = detection
 
-        self.last_target_person = target_person
-        self.getDriveDirection(target_person)
+        self.last_target = target
+        self.target_distance = target.position.z
+        self.getTargetDirection()
 
     def dockCallback(self, msg: Dock):
         self.is_docked = msg.is_docked
@@ -173,43 +320,45 @@ class FollowBot(Node):
             self.undock()
 
         while True:
-            if self.direction == self.STOP:
-                self.drive(0.0, 0.0)
-                self.setLed(0, 0, 1000, 0.0)
-                self.setLed(1, 2, 1000, 1.0)
-            elif self.direction == self.FORWARD:
-                self.drive(0.3, 0.0)
-                self.setLed(0, 1, 1000, 1.0)
-                self.setLed(1, 1, 1000, 1.0)
-            elif self.direction == self.LEFT:
-                self.drive(0.0, 0.3)
-                self.previous_direction = self.LEFT
-                self.setLed(0, 0, 1000, 0.5)
-                self.setLed(1, 1, 1000, 0.5)
-            elif self.direction == self.RIGHT:
-                self.drive(0.0, -0.3)
-                self.previous_direction = self.RIGHT
-                self.setLed(0, 1, 1000, 0.5)
-                self.setLed(1, 0, 1000, 0.5)
-            elif self.direction == self.FORWARD_LEFT:
-                self.drive(0.2, 0.2)
-                self.previous_direction = self.LEFT
-                self.setLed(0, 1, 1000, 1.0)
-                self.setLed(1, 1, 1000, 0.5)
-            elif self.direction == self.FORWARD_RIGHT:
-                self.drive(0.2, -0.2)
-                self.previous_direction = self.LEFT
-                self.setLed(0, 1, 1000, 0.5)
-                self.setLed(1, 1, 1000, 1.0)
-            else:
-                if self.previous_direction == self.LEFT:
-                    self.drive(0.0, 0.75)
-                    self.setLed(0, 0, 500, 0.5)
-                    self.setLed(1, 1, 500, 0.5)
-                else:
-                    self.drive(0.0, -0.75)
-                    self.setLed(0, 1, 500, 0.5)
-                    self.setLed(1, 0, 500, 0.5)
+            # if self.direction == self.STOP:
+            #     self.drive(0.0, 0.0)
+            #     self.setLed(0, 0, 1000, 0.0)
+            #     self.setLed(1, 2, 1000, 1.0)
+            # elif self.direction == self.FORWARD:
+            #     self.drive(0.3, 0.0)
+            #     self.setLed(0, 1, 1000, 1.0)
+            #     self.setLed(1, 1, 1000, 1.0)
+            # elif self.direction == self.LEFT:
+            #     self.drive(0.0, 0.3)
+            #     self.previous_direction = self.LEFT
+            #     self.setLed(0, 0, 1000, 0.5)
+            #     self.setLed(1, 1, 1000, 0.5)
+            # elif self.direction == self.RIGHT:
+            #     self.drive(0.0, -0.3)
+            #     self.previous_direction = self.RIGHT
+            #     self.setLed(0, 1, 1000, 0.5)
+            #     self.setLed(1, 0, 1000, 0.5)
+            # elif self.direction == self.FORWARD_LEFT:
+            #     self.drive(0.2, 0.2)
+            #     self.previous_direction = self.LEFT
+            #     self.setLed(0, 1, 1000, 1.0)
+            #     self.setLed(1, 1, 1000, 0.5)
+            # elif self.direction == self.FORWARD_RIGHT:
+            #     self.drive(0.2, -0.2)
+            #     self.previous_direction = self.LEFT
+            #     self.setLed(0, 1, 1000, 0.5)
+            #     self.setLed(1, 1, 1000, 1.0)
+            # else:
+            #     if self.previous_direction == self.LEFT:
+            #         self.drive(0.0, 0.75)
+            #         self.setLed(0, 0, 500, 0.5)
+            #         self.setLed(1, 1, 500, 0.5)
+            #     else:
+            #         self.drive(0.0, -0.75)
+            #         self.setLed(0, 1, 500, 0.5)
+            #         self.setLed(1, 0, 500, 0.5)
+            self.stateMachine()
+            print(self.state)
             time.sleep(1/self.fps)
 
 
