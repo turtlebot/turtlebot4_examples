@@ -26,15 +26,13 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data, qos_profile_system_default
 
-from vision_msgs.msg import Detection2DArray, Detection2D
-
-from depthai_ros_msgs.msg import SpatialDetectionArray, SpatialDetection
+from depthai_ros_msgs.msg import SpatialDetectionArray
 
 from turtlebot4_msgs.msg import UserLed
 
 from geometry_msgs.msg import Twist
 
-from irobot_create_msgs.action import DockServo, Undock
+from irobot_create_msgs.action import Undock
 from irobot_create_msgs.msg import Dock
 
 # FollowBot state
@@ -57,7 +55,8 @@ class FollowBot(Node):
     image_width = 300
     image_height = 300
     fps = 15
-    
+    confidence = 0.80
+
     is_docked = False
 
     target = None
@@ -89,7 +88,7 @@ class FollowBot(Node):
 
         self.undock_action_client = ActionClient(self, Undock, '/undock')
 
-    def getTargetDirection(self):
+    def setTargetDirection(self):
         if self.target is None:
             self.target_direction = Direction.UNKNOWN
             return
@@ -231,20 +230,23 @@ class FollowBot(Node):
         if len(msg.detections) > 0:
             for detection in msg.detections:
                 # Person detected
-                if detection.results[0].class_id == '15' and detection.results[0].score > 0.90:
+                if detection.results[0].class_id == '15' and \
+                   detection.results[0].score > self.confidence:
                     # No one previously detected, target first detection
                     if self.target is None:
                         target = detection
                         break
                     # Find closest target to previous target
-                    if abs(self.target.bbox.center.x - detection.bbox.center.x) < closest_target_dist:
-                        closest_target_dist = abs(self.target.bbox.center.x - detection.bbox.center.x)
+                    if abs(self.target.bbox.center.x - detection.bbox.center.x) < \
+                       closest_target_dist:
+                        closest_target_dist = abs(
+                            self.target.bbox.center.x - detection.bbox.center.x)
                         target = detection
 
         if target is not None:
             self.target_distance = target.position.z
         self.target = target
-        self.getTargetDirection()
+        self.setTargetDirection()
 
     def dockCallback(self, msg: Dock):
         self.is_docked = msg.is_docked
@@ -278,43 +280,6 @@ class FollowBot(Node):
             self.undock()
 
         while True:
-            # if self.direction == self.STOP:
-            #     self.drive(0.0, 0.0)
-            #     self.setLed(0, 0, 1000, 0.0)
-            #     self.setLed(1, 2, 1000, 1.0)
-            # elif self.direction == self.FORWARD:
-            #     self.drive(0.3, 0.0)
-            #     self.setLed(0, 1, 1000, 1.0)
-            #     self.setLed(1, 1, 1000, 1.0)
-            # elif self.direction == self.LEFT:
-            #     self.drive(0.0, 0.3)
-            #     self.previous_direction = self.LEFT
-            #     self.setLed(0, 0, 1000, 0.5)
-            #     self.setLed(1, 1, 1000, 0.5)
-            # elif self.direction == self.RIGHT:
-            #     self.drive(0.0, -0.3)
-            #     self.previous_direction = self.RIGHT
-            #     self.setLed(0, 1, 1000, 0.5)
-            #     self.setLed(1, 0, 1000, 0.5)
-            # elif self.direction == self.FORWARD_LEFT:
-            #     self.drive(0.2, 0.2)
-            #     self.previous_direction = self.LEFT
-            #     self.setLed(0, 1, 1000, 1.0)
-            #     self.setLed(1, 1, 1000, 0.5)
-            # elif self.direction == self.FORWARD_RIGHT:
-            #     self.drive(0.2, -0.2)
-            #     self.previous_direction = self.LEFT
-            #     self.setLed(0, 1, 1000, 0.5)
-            #     self.setLed(1, 1, 1000, 1.0)
-            # else:
-            #     if self.previous_direction == self.LEFT:
-            #         self.drive(0.0, 0.75)
-            #         self.setLed(0, 0, 500, 0.5)
-            #         self.setLed(1, 1, 500, 0.5)
-            #     else:
-            #         self.drive(0.0, -0.75)
-            #         self.setLed(0, 1, 500, 0.5)
-            #         self.setLed(1, 0, 500, 0.5)
             self.stateMachine()
             print(self.state)
             time.sleep(1/self.fps)
