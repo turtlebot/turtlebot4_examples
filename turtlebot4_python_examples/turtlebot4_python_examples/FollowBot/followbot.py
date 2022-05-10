@@ -63,7 +63,6 @@ class FollowBot(Node):
     target = None
     target_direction = Direction.UNKNOWN
     target_distance = 0.0
-    last_target = None
     last_target_direction = Direction.UNKNOWN
     state = State.SEARCHING
 
@@ -91,6 +90,8 @@ class FollowBot(Node):
         self.undock_action_client = ActionClient(self, Undock, '/undock')
 
     def getTargetDirection(self):
+        self.last_target_direction = self.target_direction
+
         if self.target is None:
             self.target_direction = Direction.UNKNOWN
             return
@@ -223,56 +224,6 @@ class FollowBot(Node):
                         self.setLed(0, 0, 1000, 0.5)
                         self.setLed(1, 1, 1000, 0.5)
 
-    # def getDriveDirection(self, detection: SpatialDetection):
-    #     if detection is None:
-    #         self.direction = self.UNKNOWN
-    #         return
-
-    #     position_x = detection.bbox.center.x
-    #     distance = detection.position.z
-    #     center_dist = position_x - self.image_width / 2
-
-    #     # Person is centered
-    #     if abs(center_dist) < self.fwd_margin:
-    #         # Persons box is smaller than stop lower threshold, drive forward
-    #         if distance > self.stop_lower_thresh:
-    #             self.direction = self.FORWARD
-    #         # Persons box is larger than stop upper threshold,
-    #         # stop if box width is large enough
-    #         # elif bbox_y > self.stop_upper_y_thresh:
-    #         #     if bbox_x > self.stop_upper_x_thresh:
-    #         #         self.direction = self.STOP
-    #         #     else:
-    #         #         self.direction = self.FORWARD
-    #         # Persons box is larger than stop threshold, stop
-    #         else:
-    #             self.direction = self.STOP
-    #     # Person is near center
-    #     elif abs(center_dist) < self.turn_margin:
-    #         # Person is to the right of center
-    #         if center_dist > 0.0:
-    #             # Persons box is smaller than stop threshold, drive forward and turn right
-    #             if distance > self.stop_lower_thresh:
-    #                 self.direction = self.FORWARD_RIGHT
-    #             # Persons box is larger than stop threshold, turn right
-    #             else:
-    #                 self.direction = self.RIGHT
-    #         else:
-    #             # Persons box is smaller than stop threshold, drive forward and turn left
-    #             if distance > self.stop_lower_thresh:
-    #                 self.direction = self.FORWARD_LEFT
-    #             # Persons box is larger than stop threshold, turn left
-    #             else:
-    #                 self.direction = self.LEFT
-    #     # Person is near edge of frame
-    #     else:
-    #         # Turn right
-    #         if center_dist > 0.0:
-    #             self.direction = self.RIGHT
-    #         # Turn left
-    #         else:
-    #       lastn(msg.detections) > 0:
-
     def mobilenetCallback(self, msg: SpatialDetectionArray):
         closest_target_dist = self.image_width
         target = None
@@ -281,15 +232,14 @@ class FollowBot(Node):
                 # Person detected
                 if detection.results[0].class_id == '15' and detection.results[0].score > 0.90:
                     # No one previously detected, target first detection
-                    if self.last_target is None:
+                    if self.target is None:
                         target = detection
                         break
                     # Find closest target to previous target
-                    if abs(self.last_target.bbox.center.x - detection.bbox.center.x) < closest_target_dist:
-                        closest_target_dist = abs(self.last_target.bbox.center.x - detection.bbox.center.x)
+                    if abs(self.target.bbox.center.x - detection.bbox.center.x) < closest_target_dist:
+                        closest_target_dist = abs(self.target.bbox.center.x - detection.bbox.center.x)
                         target = detection
 
-        self.last_target = target
         if target is not None:
             self.target_distance = target.position.z
         self.target = target
