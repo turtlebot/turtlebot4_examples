@@ -28,7 +28,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_turtlebot4_bringup = get_package_share_directory('turtlebot4_bringup')
     pkg_turtlebot4_description = get_package_share_directory('turtlebot4_description')
-    pkg_depthai_examples = get_package_share_directory('depthai_examples')
+    pkg_turtlebot4_cpp_examples = get_package_share_directory('turtlebot4_cpp_examples')
 
     param_file_cmd = DeclareLaunchArgument(
         'param_file',
@@ -47,7 +47,7 @@ def generate_launch_description():
     rplidar_launch_file = PathJoinSubstitution(
         [pkg_turtlebot4_bringup, 'launch', 'rplidar.launch.py'])
     oakd_launch_file = PathJoinSubstitution(
-        [pkg_depthai_examples, 'launch', 'mobile_publisher.launch.py'])
+        [pkg_turtlebot4_cpp_examples, 'launch', 'mobile_publisher.launch.py'])
     description_launch_file = PathJoinSubstitution(
         [pkg_turtlebot4_description, 'launch', 'robot_description.launch.py']
     )
