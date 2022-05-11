@@ -296,6 +296,7 @@ class FollowBot(Node):
 
         while True:
             self.stateMachine()
+            print('{0: <20}'.format(self.state), end='\r')
             time.sleep(1/self.fps)
 
 
