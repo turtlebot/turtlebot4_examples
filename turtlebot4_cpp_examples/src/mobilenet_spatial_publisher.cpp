@@ -18,7 +18,7 @@
 // Inludes common necessary includes for development using depthai library
 #include "depthai/depthai.hpp"
 
-dai::Pipeline createPipeline(bool syncNN, std::string nnPath)
+dai::Pipeline createPipeline(bool syncNN, std::string nnPath, double fps)
 {
   dai::Pipeline pipeline;
   auto colorCam = pipeline.create<dai::node::ColorCamera>();
@@ -33,16 +33,27 @@ dai::Pipeline createPipeline(bool syncNN, std::string nnPath)
   auto xoutBoundingBoxDepthMapping = pipeline.create<dai::node::XLinkOut>();
   auto xoutDepth = pipeline.create<dai::node::XLinkOut>();
 
+  auto logger = pipeline.create<dai::node::SystemLogger>();
+  logger->setRate(1.0f);
+  auto xout = pipeline.create<dai::node::XLinkOut>();
+  xout->setStreamName("sysInfo");
+  logger->out.link(xout->input);
+
   xlinkOut->setStreamName("preview");
   nnOut->setStreamName("detections");
   xoutBoundingBoxDepthMapping->setStreamName("boundingBoxDepthMapping");
   xoutDepth->setStreamName("depth");
 
+  xlinkOut->setFpsLimit(fps);
+  nnOut->setFpsLimit(fps);
+  xoutBoundingBoxDepthMapping->setFpsLimit(fps);
+  xoutDepth->setFpsLimit(fps);
+
   colorCam->setPreviewSize(300, 300);
   colorCam->setResolution(dai::ColorCameraProperties::SensorResolution::THE_1080_P);
   colorCam->setInterleaved(false);
   colorCam->setColorOrder(dai::ColorCameraProperties::ColorOrder::BGR);
-  colorCam->setFps(15);
+  colorCam->setFps(fps);
 
   monoResolution = dai::node::MonoCamera::Properties::SensorResolution::THE_400_P;
 
@@ -87,9 +98,23 @@ dai::Pipeline createPipeline(bool syncNN, std::string nnPath)
   return pipeline;
 }
 
+void printSystemInformation(dai::SystemInformation info) {
+    printf("Ddr used / total - %.2f / %.2f MiB\n", info.ddrMemoryUsage.used / (1024.0f * 1024.0f), info.ddrMemoryUsage.total / (1024.0f * 1024.0f));
+    printf("Cmx used / total - %.2f / %.2f MiB\n", info.cmxMemoryUsage.used / (1024.0f * 1024.0f), info.cmxMemoryUsage.total / (1024.0f * 1024.0f));
+    printf("LeonCss heap used / total - %.2f / %.2f MiB\n",
+           info.leonCssMemoryUsage.used / (1024.0f * 1024.0f),
+           info.leonCssMemoryUsage.total / (1024.0f * 1024.0f));
+    printf("LeonMss heap used / total - %.2f / %.2f MiB\n",
+           info.leonMssMemoryUsage.used / (1024.0f * 1024.0f),
+           info.leonMssMemoryUsage.total / (1024.0f * 1024.0f));
+    const auto& t = info.chipTemperature;
+    printf("Chip temperature - average: %.2f, css: %.2f, mss: %.2f, upa: %.2f, dss: %.2f\n", t.average, t.css, t.mss, t.upa, t.dss);
+    printf("Cpu usage - Leon CSS: %.2f %%, Leon MSS: %.2f %%\n", info.leonCssCpuUsage.average * 100, info.leonMssCpuUsage.average * 100);
+    printf("----------------------------------------\n");
+}
+
 int main(int argc, char ** argv)
 {
-
   rclcpp::init(argc, argv);
   auto node = rclcpp::Node::make_shared("mobilenet_spatial_node");
 
@@ -98,14 +123,17 @@ int main(int argc, char ** argv)
   std::string nnPath(BLOB_PATH);
   bool syncNN;
   int bad_params = 0;
+  double fps;
 
   node->declare_parameter("tf_prefix", "oak");
   node->declare_parameter("camera_param_uri", cameraParamUri);
   node->declare_parameter("sync_nn", true);
   node->declare_parameter<std::string>("nn_path", "");
+  node->declare_parameter("fps", 15.0);
   node->get_parameter("tf_prefix", tfPrefix);
   node->get_parameter("camera_param_uri", cameraParamUri);
   node->get_parameter("sync_nn", syncNN);
+  node->get_parameter("fps", fps);
 
   // Uses the path from param if passed or else uses from BLOB_PATH from CMAKE
   std::string nnParam;
@@ -114,17 +142,19 @@ int main(int argc, char ** argv)
     node->get_parameter("nn_path", nnPath);
   }
 
-  dai::Pipeline pipeline = createPipeline(syncNN, nnPath);
+  dai::Pipeline pipeline = createPipeline(syncNN, nnPath, fps);
   dai::Device device(pipeline);
+
+  auto qSysInfo = device.getOutputQueue("sysInfo", 4, false);
 
   std::shared_ptr<dai::DataOutputQueue> previewQueue = device.getOutputQueue(
     "preview", 30, false);
   std::shared_ptr<dai::DataOutputQueue> nNetDataQueue = device.getOutputQueue(
     "detections", 30, false);
   std::shared_ptr<dai::DataOutputQueue> depthQueue = device.getOutputQueue(
-    "depth", 30, false);
+    "depth", 4, false);
   std::shared_ptr<dai::DataOutputQueue> bboxQueue = device.getOutputQueue(
-    "boundingBoxDepthMapping", 30, false);
+    "boundingBoxDepthMapping", 4, false);
 
   std::string color_uri = cameraParamUri + "/" + "color.yaml";
 
@@ -159,7 +189,16 @@ int main(int argc, char ** argv)
   detectionPublish.addPublisherCallback();
   rgbPublish.addPublisherCallback();
 
-  rclcpp::spin(node);
+  while(true)
+  {
+    rclcpp::spin_some(node);
+    auto sysInfo = qSysInfo->tryGet<dai::SystemInformation>();
+    if (sysInfo != nullptr)
+    {
+        printSystemInformation(*sysInfo);
+    }
+  }
+  
 
   return 0;
 }
